@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Stream Gallery</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-aVuvXr3cNuJjGHEwES/fvHzSoZD3sFTRCWQ+WiYZ3OaOQ9cq5i71Oi/PRTDFReYDW6aXzMfmyjJlC+lzzkDXfg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #111;
+      color: white;
+    }
+    header {
+      padding: 10px;
+      background: #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .controls {
+      display: flex;
+      gap: 1em;
+      align-items: center;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(var(--video-size, 300px), 1fr));
+      gap: 10px;
+      padding: 10px;
+    }
+    .stream {
+      position: relative;
+      cursor: pointer;
+    }
+    .stream video {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 0;
+      border: 2px solid transparent;
+    }
+    .unmuted video {
+      border: 2px solid #0f0;
+    }
+    .stream.fullscreen video {
+      border: none !important;
+    }
+    .label, .index-label, .input-label {
+      position: absolute;
+      left: 5px;
+      background: rgba(0,0,0,0.7);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      display: none;
+    }
+    .label {
+      bottom: 5px;
+    }
+    .index-label {
+      top: 5px;
+    }
+    .input-label {
+      top: 25px;
+    }
+    .stream:hover .label, .stream:hover .index-label, .stream:hover .input-label {
+      display: block;
+    }
+    .label i {
+      margin-right: 5px;
+    }
+    .size-buttons button {
+      background: #333;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    #feedSelector {
+      color: white;
+      background: none;
+      border: none;
+      font-size: 1.2em;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body data-mode="9now">
+  <header>
+    <div>
+      <button id="feedSelector">9Now Feeds</button> <span id="streamCount"></span>
+    </div>
+    <div class="controls">
+      <label>
+        <input type="checkbox" id="filterLooped"> Hide looped
+      </label>
+      <label>
+        <input type="checkbox" id="limitResolution" checked> Limit resolution (unless full screen)
+      </label>
+      <div class="size-buttons">
+        <button id="decreaseSize"><i class="fas fa-minus"></i></button>
+        <span id="currentSizeLabel"></span>
+        <button id="increaseSize"><i class="fas fa-plus"></i></button>
+      </div>
+    </div>
+  </header>
+  <main class="grid" id="streamGrid"></main>
+  <script>
+    const grid = document.getElementById('streamGrid');
+    const limitResCheckbox = document.getElementById('limitResolution');
+    const filterLoopedCheckbox = document.getElementById('filterLooped');
+    const decreaseSize = document.getElementById('decreaseSize');
+    const increaseSize = document.getElementById('increaseSize');
+    const currentSizeLabel = document.getElementById('currentSizeLabel');
+    const streamCount = document.getElementById('streamCount');
+    const feedSelector = document.getElementById('feedSelector');
+
+    const sizes = [200, 250, 300, 350, 400, 450];
+    let currentSize = parseInt(getCookie('videoSize')) || 300;
+    let streamCounter = 0;
+    let validCounter = 0;
+
+    function updateVideoSize(size) {
+      currentSize = size;
+      document.documentElement.style.setProperty('--video-size', `${size}px`);
+      currentSizeLabel.textContent = `${size}px`;
+      setCookie('videoSize', size);
+    }
+
+    decreaseSize.addEventListener('click', () => {
+      const idx = sizes.indexOf(currentSize);
+      if (idx > 0) updateVideoSize(sizes[idx - 1]);
+    });
+
+    increaseSize.addEventListener('click', () => {
+      const idx = sizes.indexOf(currentSize);
+      if (idx < sizes.length - 1) updateVideoSize(sizes[idx + 1]);
+    });
+
+    updateVideoSize(currentSize);
+    limitResCheckbox.checked = getCookie('limitResolution') !== 'false';
+    filterLoopedCheckbox.checked = getCookie('filterLooped') === 'true';
+
+    limitResCheckbox.addEventListener('change', () => {
+      setCookie('limitResolution', limitResCheckbox.checked);
+    });
+
+    filterLoopedCheckbox.addEventListener('change', () => {
+      setCookie('filterLooped', filterLoopedCheckbox.checked);
+      loadStreams();
+    });
+
+    feedSelector.addEventListener('click', () => {
+      const currentMode = document.body.dataset.mode;
+      const nextMode = currentMode === '9now' ? 'ch9' : '9now';
+      document.body.dataset.mode = nextMode;
+      feedSelector.textContent = nextMode === '9now' ? '9Now Feeds' : 'Ch9 Feeds';
+      loadStreams();
+    });
+
+    function detectLoop(video) {
+      const checkLoop = () => {
+        const duration = video.duration;
+        video.dataset.loop = (!isNaN(duration) && Math.abs(duration - 85) < 1).toString();
+        if (filterLoopedCheckbox.checked && video.dataset.loop === 'true') {
+          video.closest('.stream')?.remove();
+          updateStreamCount();
+        } else {
+          streamCounter++;
+          updateStreamCount();
+        }
+      };
+      if (video.readyState >= 1) {
+        checkLoop();
+      } else {
+        video.addEventListener('loadedmetadata', checkLoop);
+      }
+    }
+
+    function updateStreamCount() {
+      streamCount.textContent = `${validCounter} valid, ${streamCounter} active`;
+    }
+
+    function getStreamUrl(mode, index) {
+      if (mode === 'ch9') {
+        return `https://csm-e.tls1.digital-prod.cdn.coull.tv/prod/event/tbs/ch9/input${index}/r1/index.m3u8`;
+      }
+      return `https://9now-livestreams-v2.akamaized.net/prod/event/tbs/9now/input${index}/r1/index.m3u8`;
+    }
+
+    async function testStream(url) {
+      try {
+        const response = await fetch(url, { method: 'HEAD' });
+        return response.ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function createVideoElement(url, indexLabel) {
+      const valid = await testStream(url);
+      if (!valid) return;
+      validCounter++;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'stream';
+      const video = document.createElement('video');
+      video.autoplay = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.controls = false;
+      video.loop = true;
+
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Checking stream...`;
+
+      const indexDiv = document.createElement('div');
+      indexDiv.className = 'index-label';
+      indexDiv.textContent = indexLabel;
+
+      const inputDiv = document.createElement('div');
+      inputDiv.className = 'input-label';
+      inputDiv.textContent = indexLabel;
+
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play();
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = url;
+        video.addEventListener('loadedmetadata', () => {
+          video.play();
+        });
+      }
+
+      video.addEventListener('loadeddata', () => {
+        detectLoop(video);
+        setTimeout(() => {
+          label.innerHTML = video.dataset.loop === 'true'
+            ? '<i class="fas fa-redo"></i> Looped video'
+            : '<i class="fas fa-broadcast-tower"></i> Live stream';
+        }, 1000);
+        if (limitResCheckbox.checked && !document.fullscreenElement) {
+          video.setAttribute('height', 360);
+        }
+      });
+
+      video.addEventListener('error', () => {
+        wrapper.remove();
+      });
+
+      video.addEventListener('click', () => {
+        if (document.fullscreenElement !== video) {
+          if (!video.muted) {
+            video.muted = true;
+            wrapper.classList.remove('unmuted');
+          } else {
+            video.muted = false;
+            wrapper.classList.add('unmuted');
+          }
+        }
+      });
+
+      video.addEventListener('dblclick', () => {
+        wrapper.requestFullscreen();
+        wrapper.classList.add('fullscreen');
+      });
+
+      document.addEventListener('fullscreenchange', () => {
+        document.querySelectorAll('.stream').forEach(el => {
+          el.classList.toggle('fullscreen', el === document.fullscreenElement);
+        });
+      });
+
+      video.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        window.open(url, '_blank');
+      });
+
+      wrapper.appendChild(video);
+      wrapper.appendChild(label);
+      wrapper.appendChild(indexDiv);
+      wrapper.appendChild(inputDiv);
+      grid.appendChild(wrapper);
+    }
+
+    async function loadStreams() {
+      grid.innerHTML = '';
+      streamCounter = 0;
+      validCounter = 0;
+      const mode = document.body.dataset.mode;
+      for (let i = 1; i <= 100; i++) {
+        const index = i.toString().padStart(2, '0');
+        const url = getStreamUrl(mode, index);
+        await createVideoElement(url, `input${index}`);
+      }
+      updateStreamCount();
+    }
+
+    function setCookie(name, value) {
+      document.cookie = `${name}=${value}; path=/; max-age=31536000`;
+    }
+
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? match[2] : null;
+    }
+
+    loadStreams();
+  </script>
+</body>
+</html>
