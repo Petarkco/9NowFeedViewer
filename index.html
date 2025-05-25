@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>9 Now Feed Viewer</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>9Now Feed Viewer</title>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
   <style>
     body {
       margin: 0;
@@ -48,10 +53,12 @@
     .stream.fullscreen video {
       border: none !important;
     }
-    .label, .index-label, .input-label {
+    .label,
+    .index-label,
+    .input-label {
       position: absolute;
       left: 5px;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0, 0, 0, 0.7);
       padding: 4px 8px;
       border-radius: 4px;
       font-size: 12px;
@@ -66,7 +73,9 @@
     .input-label {
       top: 25px;
     }
-    .stream:hover .label, .stream:hover .index-label, .stream:hover .input-label {
+    .stream:hover .label,
+    .stream:hover .index-label,
+    .stream:hover .input-label {
       display: block;
     }
     .label i {
@@ -87,20 +96,32 @@
       font-size: 1.2em;
       cursor: pointer;
       text-decoration: underline;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      padding-right: 20px;
+      background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2210%22%20height%3D%227%22%20viewBox%3D%220%200%2010%207%22%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%3E%3Cpath%20d%3D%22M0%200l5%207%205-7z%22%20fill%3D%22white%22/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 5px center;
+      background-size: 10px 7px;
     }
   </style>
 </head>
 <body data-mode="9now">
   <header>
     <div>
-      <button id="feedSelector">9Now Feeds</button> <span id="streamCount"></span>
+      <select id="feedSelector" aria-label="Select feed source">
+        <option value="9now">9Now Feeds</option>
+        <option value="ch9">Ch9 Feeds</option>
+      </select>
+      <span id="streamCount"></span>
     </div>
     <div class="controls">
       <label>
-        <input type="checkbox" id="filterLooped"> Hide looped
+        <input type="checkbox" id="filterLooped" /> Hide looped
       </label>
       <label>
-        <input type="checkbox" id="limitResolution" checked> Limit resolution (unless full screen)
+        <input type="checkbox" id="limitResolution" checked /> Limit resolution (unless full screen)
       </label>
       <div class="size-buttons">
         <button id="decreaseSize"><i class="fas fa-minus"></i></button>
@@ -110,198 +131,190 @@
     </div>
   </header>
   <main class="grid" id="streamGrid"></main>
+
   <script>
-    const grid = document.getElementById('streamGrid');
-    const limitResCheckbox = document.getElementById('limitResolution');
-    const filterLoopedCheckbox = document.getElementById('filterLooped');
-    const decreaseSize = document.getElementById('decreaseSize');
-    const increaseSize = document.getElementById('increaseSize');
-    const currentSizeLabel = document.getElementById('currentSizeLabel');
-    const streamCount = document.getElementById('streamCount');
-    const feedSelector = document.getElementById('feedSelector');
+    const grid = document.getElementById("streamGrid");
+    const limitResCheckbox = document.getElementById("limitResolution");
+    const filterLoopedCheckbox = document.getElementById("filterLooped");
+    const decreaseSize = document.getElementById("decreaseSize");
+    const increaseSize = document.getElementById("increaseSize");
+    const currentSizeLabel = document.getElementById("currentSizeLabel");
+    const streamCount = document.getElementById("streamCount");
+    const feedSelector = document.getElementById("feedSelector");
+
+    const cityLabels = {
+      syd: "Sydney",
+      mel: "Melbourne",
+      bne: "Brisbane",
+      adl: "Adelaide",
+      per: "Perth",
+      new: "Newcastle",
+      nlm: "Northern Rivers",
+      gcq: "Gold Coast",
+    };
 
     const sizes = [200, 250, 300, 350, 400, 450];
-    let currentSize = parseInt(getCookie('videoSize')) || 300;
+    let currentSize = parseInt(getCookie("videoSize")) || 300;
     let streamCounter = 0;
     let validCounter = 0;
 
     function updateVideoSize(size) {
       currentSize = size;
-      document.documentElement.style.setProperty('--video-size', `${size}px`);
+      document.documentElement.style.setProperty("--video-size", `${size}px`);
       currentSizeLabel.textContent = `${size}px`;
-      setCookie('videoSize', size);
+      setCookie("videoSize", size);
     }
 
-    decreaseSize.addEventListener('click', () => {
+    decreaseSize.addEventListener("click", () => {
       const idx = sizes.indexOf(currentSize);
       if (idx > 0) updateVideoSize(sizes[idx - 1]);
     });
 
-    increaseSize.addEventListener('click', () => {
+    increaseSize.addEventListener("click", () => {
       const idx = sizes.indexOf(currentSize);
       if (idx < sizes.length - 1) updateVideoSize(sizes[idx + 1]);
     });
 
     updateVideoSize(currentSize);
-    limitResCheckbox.checked = getCookie('limitResolution') !== 'false';
-    filterLoopedCheckbox.checked = getCookie('filterLooped') === 'true';
+    limitResCheckbox.checked = getCookie("limitResolution") !== "false";
+    filterLoopedCheckbox.checked = getCookie("filterLooped") === "true";
 
-    limitResCheckbox.addEventListener('change', () => {
-      setCookie('limitResolution', limitResCheckbox.checked);
+    limitResCheckbox.addEventListener("change", () => {
+      setCookie("limitResolution", limitResCheckbox.checked);
     });
 
-    filterLoopedCheckbox.addEventListener('change', () => {
-      setCookie('filterLooped', filterLoopedCheckbox.checked);
+    filterLoopedCheckbox.addEventListener("change", () => {
+      setCookie("filterLooped", filterLoopedCheckbox.checked);
       loadStreams();
     });
 
-    feedSelector.addEventListener('click', () => {
-      const currentMode = document.body.dataset.mode;
-      const nextMode = currentMode === '9now' ? 'ch9' : '9now';
-      document.body.dataset.mode = nextMode;
-      feedSelector.textContent = nextMode === '9now' ? '9Now Feeds' : 'Ch9 Feeds';
+    // Sync feed selector with current mode
+    feedSelector.value = document.body.dataset.mode || "9now";
+
+    feedSelector.addEventListener("change", () => {
+      const selectedMode = feedSelector.value;
+      document.body.dataset.mode = selectedMode;
       loadStreams();
     });
-
-    function detectLoop(video) {
-      const checkLoop = () => {
-        const duration = video.duration;
-        video.dataset.loop = (!isNaN(duration) && Math.abs(duration - 85) < 1).toString();
-        if (filterLoopedCheckbox.checked && video.dataset.loop === 'true') {
-          video.closest('.stream')?.remove();
-          updateStreamCount();
-        } else {
-          streamCounter++;
-          updateStreamCount();
-        }
-      };
-      if (video.readyState >= 1) {
-        checkLoop();
-      } else {
-        video.addEventListener('loadedmetadata', checkLoop);
-      }
-    }
-
-    function updateStreamCount() {
-      streamCount.textContent = `${validCounter} valid, ${streamCounter} active`;
-    }
-
-    function getStreamUrl(mode, index) {
-      if (mode === 'ch9') {
-        return `https://csm-e.tls1.digital-prod.cdn.coull.tv/prod/event/tbs/ch9/input${index}/r1/index.m3u8`;
-      }
-      return `https://9now-livestreams-v2.akamaized.net/prod/event/tbs/9now/input${index}/r1/index.m3u8`;
-    }
 
     async function testStream(url) {
       try {
-        const response = await fetch(url, { method: 'HEAD' });
+        const response = await fetch(url, { method: "HEAD" });
         return response.ok;
       } catch (e) {
         return false;
       }
     }
 
-    async function createVideoElement(url, indexLabel) {
-      const valid = await testStream(url);
-      if (!valid) return;
+    async function createVideoElement(url, labelKey) {
+      const isValid = await testStream(url);
+      if (!isValid) return;
       validCounter++;
-
-      const wrapper = document.createElement('div');
-      wrapper.className = 'stream';
-      const video = document.createElement('video');
+      const wrapper = document.createElement("div");
+      wrapper.className = "stream";
+      const video = document.createElement("video");
       video.autoplay = true;
       video.muted = true;
       video.playsInline = true;
       video.controls = false;
       video.loop = true;
 
-      const label = document.createElement('div');
-      label.className = 'label';
-      label.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Checking stream...`;
+      const label = document.createElement("div");
+      label.className = "label";
+      label.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking stream...';
 
-      const indexDiv = document.createElement('div');
-      indexDiv.className = 'index-label';
-      indexDiv.textContent = indexLabel;
+      const inputLabel = document.createElement("div");
+      inputLabel.className = "input-label";
+      inputLabel.textContent =
+        labelKey in cityLabels
+          ? cityLabels[labelKey.toLowerCase()]
+          : labelKey;
 
-      const inputDiv = document.createElement('div');
-      inputDiv.className = 'input-label';
-      inputDiv.textContent = indexLabel;
+      const hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play();
+      });
 
-      if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          video.play();
-        });
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = url;
-        video.addEventListener('loadedmetadata', () => {
-          video.play();
-        });
+      video.addEventListener("loadedmetadata", () => {
+        const duration = video.duration;
+        const isLoop = !isNaN(duration) && Math.abs(duration - 85) < 1;
+        video.dataset.loop = isLoop;
+        if (filterLoopedCheckbox.checked && isLoop) {
+          wrapper.remove();
+          return;
+        }
+        streamCounter++;
+        label.innerHTML = isLoop
+          ? '<i class="fas fa-redo"></i> Looped video'
+          : '<i class="fas fa-broadcast-tower"></i> Live stream';
+        updateStreamCount();
+      });
+
+      if (limitResCheckbox.checked && !document.fullscreenElement) {
+        video.setAttribute("height", 360);
       }
 
-      video.addEventListener('loadeddata', () => {
-        detectLoop(video);
-        setTimeout(() => {
-          label.innerHTML = video.dataset.loop === 'true'
-            ? '<i class="fas fa-redo"></i> Looped video'
-            : '<i class="fas fa-broadcast-tower"></i> Live stream';
-        }, 1000);
-        if (limitResCheckbox.checked && !document.fullscreenElement) {
-          video.setAttribute('height', 360);
+      video.addEventListener("click", () => {
+        if (!video.muted) {
+          video.muted = true;
+          wrapper.classList.remove("unmuted");
+        } else {
+          video.muted = false;
+          wrapper.classList.add("unmuted");
         }
       });
 
-      video.addEventListener('error', () => {
-        wrapper.remove();
-      });
-
-      video.addEventListener('click', () => {
-        if (document.fullscreenElement !== video) {
-          if (!video.muted) {
-            video.muted = true;
-            wrapper.classList.remove('unmuted');
-          } else {
-            video.muted = false;
-            wrapper.classList.add('unmuted');
-          }
+      video.addEventListener("dblclick", async () => {
+        try {
+          await video.requestFullscreen();
+          wrapper.classList.add("fullscreen");
+        } catch (err) {
+          console.error("Fullscreen error:", err);
         }
       });
 
-      video.addEventListener('dblclick', () => {
-        wrapper.requestFullscreen();
-        wrapper.classList.add('fullscreen');
+      document.addEventListener("fullscreenchange", () => {
+        if (!document.fullscreenElement) {
+          document
+            .querySelectorAll(".fullscreen")
+            .forEach((el) => el.classList.remove("fullscreen"));
+        }
       });
 
-      document.addEventListener('fullscreenchange', () => {
-        document.querySelectorAll('.stream').forEach(el => {
-          el.classList.toggle('fullscreen', el === document.fullscreenElement);
-        });
-      });
-
-      video.addEventListener('contextmenu', (e) => {
+      video.addEventListener("contextmenu", (e) => {
         e.preventDefault();
-        window.open(url, '_blank');
+        window.open(url, "_blank");
       });
 
       wrapper.appendChild(video);
       wrapper.appendChild(label);
-      wrapper.appendChild(indexDiv);
-      wrapper.appendChild(inputDiv);
+      wrapper.appendChild(inputLabel);
       grid.appendChild(wrapper);
     }
 
+    function updateStreamCount() {
+      streamCount.textContent = `${validCounter} valid, ${streamCounter} active`;
+    }
+
     async function loadStreams() {
-      grid.innerHTML = '';
+      grid.innerHTML = "";
       streamCounter = 0;
       validCounter = 0;
       const mode = document.body.dataset.mode;
-      for (let i = 1; i <= 100; i++) {
-        const index = i.toString().padStart(2, '0');
-        const url = getStreamUrl(mode, index);
-        await createVideoElement(url, `input${index}`);
+      if (mode === "ch9") {
+        const cities = ["syd", "mel", "bne", "adl", "per", "new", "nlm", "gcq"];
+        for (const city of cities) {
+          const url = `https://9now-livestreams-fhd-t.akamaized.net/u/prod/simulcast/${city}/ch9/hls/r1/index.m3u8`;
+          await createVideoElement(url, city);
+        }
+      } else if (mode === "9now") {
+        for (let i = 1; i <= 100; i++) {
+          const index = i.toString().padStart(2, "0");
+          const url = `https://9now-livestreams-v2.akamaized.net/prod/event/tbs/9now/input${index}/r1/index.m3u8`;
+          await createVideoElement(url, `input${index}`);
+        }
       }
       updateStreamCount();
     }
@@ -311,7 +324,9 @@
     }
 
     function getCookie(name) {
-      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      const match = document.cookie.match(
+        new RegExp("(^| )" + name + "=([^;]+)")
+      );
       return match ? match[2] : null;
     }
 
