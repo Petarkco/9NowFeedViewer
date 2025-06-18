@@ -48,7 +48,7 @@
     .stream.fullscreen video {
       border: none !important;
     }
-    .label, .index-label, .input-label {
+    .label, .input-label {
       position: absolute;
       left: 5px;
       background: rgba(0,0,0,0.7);
@@ -57,20 +57,11 @@
       font-size: 12px;
       display: none;
     }
-    .label {
-      bottom: 5px;
-    }
-    .index-label {
-      top: 5px;
-    }
-    .input-label {
-      top: 25px;
-    }
-    .stream:hover .label, .stream:hover .index-label, .stream:hover .input-label {
+    .label { bottom: 5px; }
+    .input-label { top: 5px; }
+    .stream:hover .label,
+    .stream:hover .input-label {
       display: block;
-    }
-    .label i {
-      margin-right: 5px;
     }
     .size-buttons button {
       background: #333;
@@ -86,6 +77,29 @@
       border: none;
       font-size: 1em;
       padding: 5px 10px;
+    }
+    /* Hover icon for opening stream URL */
+    .link-icon {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: rgba(0,0,0,0.7);
+      padding: 4px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: none;
+    }
+    .stream:hover .link-icon {
+      display: block;
+    }
+    /* Hide native fullscreen controls except volume and captions */
+    video::-webkit-media-controls {
+      display: none !important;
+    }
+    video::-webkit-media-controls-volume-slider,
+    video::-webkit-media-controls-mute-button,
+    video::-webkit-media-controls-caption-button {
+      display: block !important;
     }
   </style>
 </head>
@@ -134,6 +148,13 @@
     let validCounter = 0;
     let currentLoadSession = 0;
 
+    // Restore saved view mode
+    const savedView = getCookie('viewMode');
+    if (savedView) {
+      feedSelector.value = savedView;
+      document.body.dataset.mode = savedView;
+    }
+
     function updateVideoSize(size) {
       currentSize = size;
       document.documentElement.style.setProperty('--video-size', `${size}px`);
@@ -165,7 +186,9 @@
     });
 
     feedSelector.addEventListener('change', () => {
-      document.body.dataset.mode = feedSelector.value;
+      const mode = feedSelector.value;
+      document.body.dataset.mode = mode;
+      setCookie('viewMode', mode);
       loadStreams();
     });
 
@@ -246,14 +269,18 @@
         }
       });
 
-      video.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
+      const linkIcon = document.createElement('div');
+      linkIcon.className = 'link-icon';
+      linkIcon.innerHTML = '<i class="fas fa-external-link-alt"></i>';
+      linkIcon.addEventListener('click', e => {
+        e.stopPropagation();
         window.open(url, '_blank');
       });
 
       wrapper.appendChild(video);
       wrapper.appendChild(label);
       wrapper.appendChild(inputLabel);
+      wrapper.appendChild(linkIcon);
       grid.appendChild(wrapper);
       return true;
     }
@@ -276,7 +303,16 @@
           await createVideoElement(url, city);
         }
       } else if (mode === '9now') {
-        for (let i = 1; i <= 100; i++) {
+        // Assume inputs 01-30 are valid
+        for (let i = 1; i <= 30; i++) {
+          if (loadSession !== currentLoadSession) return;
+          const index = i.toString().padStart(2, '0');
+          const url = `https://9now-livestreams-v2.akamaized.net/prod/event/tbs/9now/input${index}/r1/index.m3u8`;
+          // create without validity break
+          await createVideoElement(url, `input${index}`);
+        }
+        // Continue checking from input31 until invalid
+        for (let i = 31; i <= 100; i++) {
           if (loadSession !== currentLoadSession) return;
           const index = i.toString().padStart(2, '0');
           const url = `https://9now-livestreams-v2.akamaized.net/prod/event/tbs/9now/input${index}/r1/index.m3u8`;
