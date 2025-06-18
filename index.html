@@ -1,91 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>9Now Feed Viewer</title>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <style>
-    body {
-      margin: 0;
-      font-family: sans-serif;
-      background: #111;
-      color: white;
-    }
-    header {
-      padding: 10px;
-      background: #222;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .controls {
-      display: flex;
-      gap: 1em;
-      align-items: center;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(var(--video-size, 300px), 1fr));
-      gap: 10px;
-      padding: 10px;
-    }
-    .stream {
-      position: relative;
-      cursor: pointer;
-    }
-    .stream video {
-      width: 100%;
-      height: auto;
-      display: block;
-      border-radius: 0;
-      border: 2px solid transparent;
-    }
-    .unmuted video {
-      border: 2px solid #0f0;
-    }
-    .stream.fullscreen video {
-      border: none !important;
-    }
-    .label, .index-label, .input-label {
+    /* ... your original styles ... */
+    .open-button {
       position: absolute;
-      left: 5px;
-      background: rgba(0,0,0,0.7);
-      padding: 4px 8px;
+      bottom: 5px;
+      right: 5px;
+      background: rgba(0,0,0,0.5);
+      padding: 4px;
       border-radius: 4px;
-      font-size: 12px;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
       display: none;
     }
-    .label {
-      bottom: 5px;
-    }
-    .index-label {
-      top: 5px;
-    }
-    .input-label {
-      top: 25px;
-    }
-    .stream:hover .label, .stream:hover .index-label, .stream:hover .input-label {
+    .stream:hover .open-button {
       display: block;
     }
-    .label i {
-      margin-right: 5px;
+    ::cue { color: white; }
+    video::-webkit-media-controls {
+      display: none !important;
     }
-    .size-buttons button {
-      background: #333;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      cursor: pointer;
-      font-size: 1em;
-    }
-    #feedSelector {
-      background: #333;
-      color: white;
-      border: none;
-      font-size: 1em;
-      padding: 5px 10px;
+    video::-webkit-media-controls-volume-slider,
+    video::-webkit-media-controls-mute-button,
+    video::-webkit-media-controls-toggle-closed-captions-button {
+      display: block !important;
     }
   </style>
 </head>
@@ -98,85 +43,26 @@
       </select>
       <span id="streamCount"></span>
     </div>
-    <div class="controls">
-      <label>
-        <input type="checkbox" id="filterLooped"> Hide looped
-      </label>
-      <label>
-        <input type="checkbox" id="limitResolution" checked> Limit resolution (unless full screen)
-      </label>
-      <div class="size-buttons">
-        <button id="decreaseSize"><i class="fas fa-minus"></i></button>
-        <span id="currentSizeLabel"></span>
-        <button id="increaseSize"><i class="fas fa-plus"></i></button>
-      </div>
-    </div>
+    <!-- ... rest of your header ... -->
   </header>
   <main class="grid" id="streamGrid"></main>
   <script>
-    const grid = document.getElementById('streamGrid');
-    const limitResCheckbox = document.getElementById('limitResolution');
-    const filterLoopedCheckbox = document.getElementById('filterLooped');
-    const decreaseSize = document.getElementById('decreaseSize');
-    const increaseSize = document.getElementById('increaseSize');
-    const currentSizeLabel = document.getElementById('currentSizeLabel');
-    const streamCount = document.getElementById('streamCount');
     const feedSelector = document.getElementById('feedSelector');
+    const grid = document.getElementById('streamGrid');
+    // ... other constants ...
 
-    const cityLabels = {
-      syd: 'Sydney', mel: 'Melbourne', bne: 'Brisbane', adl: 'Adelaide',
-      per: 'Perth', new: 'Newcastle', nlm: 'Northern Rivers', gcq: 'Gold Coast'
-    };
-
-    const sizes = [100, 150, 200, 250, 300, 350, 400, 450, 500, 600];
-    let currentSize = parseInt(getCookie('videoSize')) || Math.min(window.innerWidth / 6, 300);
-    let streamCounter = 0;
-    let validCounter = 0;
-    let currentLoadSession = 0;
-
-    function updateVideoSize(size) {
-      currentSize = size;
-      document.documentElement.style.setProperty('--video-size', `${size}px`);
-      currentSizeLabel.textContent = `${size}px`;
-      setCookie('videoSize', size);
+    // Restore feed mode from cookie
+    const savedMode = getCookie('selectedFeed');
+    if (savedMode) {
+      feedSelector.value = savedMode;
+      document.body.dataset.mode = savedMode;
     }
-
-    decreaseSize.addEventListener('click', () => {
-      const idx = sizes.indexOf(currentSize);
-      if (idx > 0) updateVideoSize(sizes[idx - 1]);
-    });
-
-    increaseSize.addEventListener('click', () => {
-      const idx = sizes.indexOf(currentSize);
-      if (idx < sizes.length - 1) updateVideoSize(sizes[idx + 1]);
-    });
-
-    updateVideoSize(currentSize);
-    limitResCheckbox.checked = getCookie('limitResolution') !== 'false';
-    filterLoopedCheckbox.checked = getCookie('filterLooped') === 'true';
-
-    limitResCheckbox.addEventListener('change', () => {
-      setCookie('limitResolution', limitResCheckbox.checked);
-    });
-
-    filterLoopedCheckbox.addEventListener('change', () => {
-      setCookie('filterLooped', filterLoopedCheckbox.checked);
-      loadStreams();
-    });
 
     feedSelector.addEventListener('change', () => {
       document.body.dataset.mode = feedSelector.value;
+      setCookie('selectedFeed', feedSelector.value);
       loadStreams();
     });
-
-    async function testStream(url) {
-      try {
-        const response = await fetch(url, { method: 'HEAD' });
-        return response.ok;
-      } catch (e) {
-        return false;
-      }
-    }
 
     async function createVideoElement(url, labelKey) {
       const isValid = await testStream(url);
@@ -184,6 +70,7 @@
       validCounter++;
       const wrapper = document.createElement('div');
       wrapper.className = 'stream';
+
       const video = document.createElement('video');
       video.autoplay = true;
       video.muted = true;
@@ -197,7 +84,16 @@
 
       const inputLabel = document.createElement('div');
       inputLabel.className = 'input-label';
-      inputLabel.textContent = labelKey in cityLabels ? cityLabels[labelKey.toLowerCase()] : labelKey;
+      inputLabel.textContent = cityLabels[labelKey.toLowerCase()] || labelKey;
+
+      const openBtn = document.createElement('div');
+      openBtn.className = 'open-button';
+      openBtn.innerHTML = '<i class="fas fa-external-link-alt"></i>';
+      openBtn.title = "Open in new tab";
+      openBtn.onclick = (e) => {
+        e.stopPropagation();
+        window.open(url, '_blank');
+      };
 
       const hls = new Hls();
       hls.loadSource(url);
@@ -247,19 +143,15 @@
       });
 
       video.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        window.open(url, '_blank');
+        e.preventDefault(); // Removed open on right-click
       });
 
       wrapper.appendChild(video);
       wrapper.appendChild(label);
       wrapper.appendChild(inputLabel);
+      wrapper.appendChild(openBtn);
       grid.appendChild(wrapper);
       return true;
-    }
-
-    function updateStreamCount() {
-      streamCount.textContent = `${validCounter} valid, ${streamCounter} active`;
     }
 
     async function loadStreams() {
@@ -276,7 +168,7 @@
           await createVideoElement(url, city);
         }
       } else if (mode === '9now') {
-        for (let i = 1; i <= 100; i++) {
+        for (let i = 31; i <= 100; i++) {
           if (loadSession !== currentLoadSession) return;
           const index = i.toString().padStart(2, '0');
           const url = `https://9now-livestreams-v2.akamaized.net/prod/event/tbs/9now/input${index}/r1/index.m3u8`;
@@ -287,14 +179,7 @@
       updateStreamCount();
     }
 
-    function setCookie(name, value) {
-      document.cookie = `${name}=${value}; path=/; max-age=31536000`;
-    }
-
-    function getCookie(name) {
-      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-      return match ? match[2] : null;
-    }
+    // ... setCookie / getCookie / videoSize setup ...
 
     loadStreams();
   </script>
